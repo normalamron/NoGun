@@ -29,9 +29,11 @@ float gF_Delay[MAXPLAYERS + 1];
 
 Cookie gC_ShowImpactsCookie = null;
 Cookie gC_ImpactColorIndex = null;
+Cookie gC_BlockPickupCookie = null;
 
 bool gB_Late;
 bool gB_ShowImpacts[MAXPLAYERS + 1] = {true, ...};
+bool gB_BlockPickup[MAXPLAYERS + 1] = {false, ...};
 bool gB_Debug;
 
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
@@ -49,6 +51,7 @@ public void OnPluginStart()
 
     gC_ShowImpactsCookie = new Cookie("sm_nogunimpacts", "Toggle the displaying of the NoGun show impacts.", CookieAccess_Protected);
     gC_ImpactColorIndex = new Cookie("sm_nogunimpactcolor", "The display color of the NoGun impacts.", CookieAccess_Protected);
+    gC_BlockPickupCookie = new Cookie("sm_nogunblockpickup", "Toggle blocking weapon pickups.", CookieAccess_Protected);
 
     for(int client = 1; client <= MaxClients; client++)
     {
@@ -78,6 +81,10 @@ public void OnClientCookiesCached(int client)
     gC_ImpactColorIndex.Get(client, cookie, sizeof(cookie));
     gI_ImpactColor[client] = (strlen(cookie) > 0) ? view_as<Color>(StringToInt(cookie)) : RED;
     cookie[0] = '\0';
+
+    gC_BlockPickupCookie.Get(client, cookie, sizeof(cookie));
+    gB_BlockPickup[client] = (strlen(cookie) > 0) ? view_as<bool>(StringToInt(cookie)) : false;
+    cookie[0] = '\0';
 }
 
 public void OnClientPutInServer(int client)
@@ -91,6 +98,18 @@ public void OnClientPutInServer(int client)
     {
         OnClientCookiesCached(client);
     }
+
+    SDKHook(client, SDKHook_WeaponCanUse, OnWeaponCanUse);
+}
+
+public Action OnWeaponCanUse(int client, int weapon)
+{
+    if(gB_BlockPickup[client])
+    {
+        return Plugin_Handled;
+    }
+    
+    return Plugin_Continue;
 }
 
 public void OnClientConnected(int client)
@@ -134,6 +153,7 @@ bool CreateNoGunMenu(int client, int page = 0)
     menu.SetTitle("NoGun Customization Menu:\n");
 
     menu.AddItem("enabled", gB_ShowImpacts[client] ? "[X] Enabled" : "[ ] Enabled");
+    menu.AddItem("blockpickup", gB_BlockPickup[client] ? "[X] Block Weapon Pickup" : "[ ] Block Weapon Pickup");
     menu.AddItem("-1", "", ITEMDRAW_SPACER);
 
     char display[64];
@@ -156,6 +176,11 @@ public int NoGun_MenuHandler(Menu menu, MenuAction action, int param1, int param
             {
                 gB_ShowImpacts[param1] = !gB_ShowImpacts[param1];
                 gC_ShowImpactsCookie.Set(param1, gB_ShowImpacts[param1] ? "1" : "0");
+            }
+            else if(StrEqual(info, "blockpickup"))
+            {
+                gB_BlockPickup[param1] = !gB_BlockPickup[param1];
+                gC_BlockPickupCookie.Set(param1, gB_BlockPickup[param1] ? "1" : "0");
             }
             else if(StrEqual(info, "impactcolor"))
             {
